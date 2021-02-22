@@ -1,8 +1,8 @@
 ---
 title: "MATH 795 Syllabus"
 output:
-  pdf_document: default
   html_document: default
+  pdf_document: default
 ---
 
 ```{r setup, include=FALSE}
@@ -80,6 +80,7 @@ As a result of this course, students will expand their skill set to work and thi
 3. Be able to evaluate models and discuss the process of identifying parameters and models for a problem.
 4. Use resampling to revisit methods from a introductory statistics class.
 5. Discuss the inclusion of Data Science in the undergraduate and high school curriculum.
+6. Evaluate and discuss ehtical concerns with data science research generally, and specifically as it applies to research in education.
 
 ## Course Outline
 
@@ -119,7 +120,7 @@ Your grade in the class will be based on homework, presentations and videos, and
 
 I will be providing you feedback on the Homework, Class Activities and Presentations, the Projects and Project Videos. I am interested in seeing you make progreess as class continues. As such, you can revise and resubmit any assignment up until the announced deadline at the end of class.
 
-Your final grade in class will be assessed primarily from the Projects and whether I see evidence that you have met the objectives for the class. Specifically: A grade of A will mean that you have met all five course objectives, and exceeded the standard on at least 4 of them; a grade of B will mean that you have met all five course objectives, and exceed the standard on at least 2 of them; a grade of C will mean that you have met all five course objects. Finally a grade of D will mean that at least one of the standards was not met, and a grade of F will mean that multiple standards were not met or that too many assignments were missing to allow me to assess a standard.
+Your final grade in class will be assessed primarily from the Projects and whether I see evidence that you have met the objectives for the class. Specifically: A grade of A will mean that you have met all six course objectives, and exceeded the standard on at least 4 of them; a grade of B will mean that you have met all six course objectives, and exceed the standard on at least 2 of them; a grade of C will mean that you have met all six course objects. Finally a grade of D will mean that at least one of the standards was not met, and a grade of F will mean that multiple standards were not met or that too many assignments were missing to allow me to assess a standard.
 
 ## UNCO Policy Statements
 
