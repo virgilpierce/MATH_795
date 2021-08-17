@@ -1,8 +1,8 @@
 ---
 title: "MATH 795 Syllabus"
 output:
-  html_document: default
   pdf_document: default
+  html_document: default
 ---
 
 ```{r setup, include=FALSE}
@@ -23,7 +23,7 @@ Office: Ross Hall 2239
 
 ### Class Meetings
 
-Tuesday and Thursday: 3:30p - 4:45p
+Tuesday and Thursday: 8:00a - 9:15a
 
 ### Student Hours
 
@@ -46,16 +46,27 @@ Topics will include:
 
 ### Programing
 
-We will be using R for this class. I highly recommend using R Studio which comes with some additional features to improve your workflow. Course notes will be prepared in R markdown. In industry, R markdown and Jupyter markdown for Python are becoming industry standards for communicating work involving programing and statistics and we need to be introducing undergraduate students to these tools. 
+We will be using R for this class. Options for accessing R:
+
+- R Studio is a common option for accessing R, and originally was what I was recommending. However after teaching my summer course with R, I have reassessed.
+
+- I recommend using Jupyter or a Jupyter like interface. You can install Jupyter on your own machine by downloading the Anaconda Pakcage manager, installing R, and then following the instructions to add R to Jupyter. Jupyter does a better job of letting you execute code, fix it, and execute it again. I find the Markdown is also easier to use than with R Studio.
+
+- You can access a Jupyter like interface via Cocalc. This is a web interface using a shared server. As such you do not have to install anything 
+
+- You can access a Jupyter like interface via Google Colab. This is a web interface, though it does require a Google Account. As such you do not need to install anything. Getting it for R requires a Google Search of R with Google Colab, and then following the link in the Medium article -- no idea why Google is hiding the option.
+
+- You can log in to the [Apporto Virtual Server](https://unco.apporto.com) with your UNC credentials which has both Jupyter and R Studio installed.
+
+R Studio and Jupyter are both becoming industry standard for communicating work involving programing and statistics and we need to be introducing undergraduate students to these tools. 
 
 You can install R Studio directly or via the Anacoonda package manger. The software is also available on the university Apporto Virtual Server.
-
-- To install it on your own computer or laptop I recommend downloading Anaconda: [https://www.anaconda.com/products/individual](https://www.anaconda.com/products/individual).
-- You can log in to the [Apporto Virtual Server](https://unco.apporto.com) with your UNC credentials.
 
 Note that I have been teaching the undergraduate data science courses with Python. There is an active debate in the data science community about which software to use, though both are widely accepted standards. There are a ccouple of advantages to Python you should be aware of:  Python is much bigger than just statistics/data science and it is the accepted computational tool for a wide variety of fields; and Python is available through Google Colab, which has become my suggested method for students to use it.
 
 That said, both Python and R are good introductory programing langauges. Both of them provide for compact human readable code. R has an advantage when it comes to visualizations (unless you really know what you are doing). Both of them are too slow for some applications and for someone working seriously in industry learning a compiled software such as C++ will eventually be necessary.
+
+
 
 ### Course Prerequisites
 
