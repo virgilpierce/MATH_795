@@ -1,0 +1,212 @@
+---
+title: "Walkthrough 8.2 - Neural Network Models"
+output: html_notebook
+---
+
+We will be using the neuralnet package, so install that if you have not already:
+
+```{r}
+install.packages("neuralnet")
+```
+
+We will use the dataset prepared in walkthrough 8. Load the libraries needed for that as well as the code preparing the data for the model. However a wrinkle is that the neural network model function requires that our variables all be coded as numerical - i.e. we are not allowed to use factors.
+
+```{r}
+library(tidyverse)
+library(caret)
+library(ranger)
+library(e1071)
+library(tidylog)
+library(dataedu)
+
+df <- dataedu::sci_mo_with_text
+
+df <- 
+  df %>%
+  select(
+    int,
+    uv,
+    pc,
+    time_spent,
+    final_grade,
+    subject,
+    enrollment_reason,
+    semester,
+    enrollment_status,
+    cogproc,
+    social,
+    posemo,
+    negemo,
+    n
+  )
+
+nrow(df)
+
+df <- na.omit(df)
+
+nearZeroVar(df, saveMetrics = TRUE)
+df <- 
+  df %>% 
+  select(-enrollment_status)
+
+df <- 
+  df %>% 
+  mutate_if(is.character, as.factor)
+```
+
+Okay so that's the dataframe we so far from Walkthrough 8; now we need to adjust the variables that are non-numeric to be numeric. The syntax is basically identical to what we just did to turn character variables into factors:
+
+```{r}
+df <- 
+  df %>% 
+  mutate_if(is.factor, as.numeric)
+```
+
+Use glimpse to check that everything is some kind of numeric:
+
+```{r}
+glimpse(df)
+```
+
+There is an inherent danger in converting Factor and particularly Character features into numeric features. Numeric features contain both an ordering and a notion of relative distance between the values. For a dataset with a large number of factor variables we should lean more towards models built with decision trees that will not have these non-features like order and relative distance builtin. Or we should use a pivot type command to replace a column with multiple factors with multiple columns with just two values. 
+
+Neural networks are sensitive to the relative scales of the inputs. I do not completely understand why, but my instinct is that they can be quickly overwhelmed by a large scale variable and will then be unable to find the appropriate minimum. We can normalize our variables, in practice you would want to keep track of this transformation so you could apply the same transformation to new data. There are also different normalizations to try.
+
+```{r}
+normalize <- function(x) {
+ return ((x - min(x))/ (max(x) - min(x)))
+}
+
+df <- as.data.frame(lapply(df, normalize))
+```
+
+Inspect df if you like to see the change.
+
+Now we divide our dataset into testing and training sets:
+
+```{r}
+# First, we set a seed to ensure the reproducibility of our data partition.
+set.seed(2020)
+
+# we create a new object called trainIndex that will take 80 percent of the data
+trainIndex <- createDataPartition(df$final_grade,
+                                  p = .8, 
+                                  list = FALSE,
+                                  times = 1)
+
+# We add a new variable to our dataset, temporarily:
+# this will let us select our rows according to their row number
+# we populate the rows with
+# the numbers 1:464, in order
+
+df <- 
+  df %>% 
+  mutate(temp_id = 1:464)
+
+
+df_train <- 
+  df %>% 
+  filter(temp_id %in% trainIndex)
+df_test <- 
+  df %>% 
+  filter(!temp_id %in% trainIndex)
+
+
+df <- 
+  df %>% 
+  select(-temp_id)
+
+df_train <- 
+  df_train %>% 
+  select(-temp_id)
+
+df_test <- 
+  df_test %>% 
+  select(-temp_id)
+```
+
+You should have two dataframes one for training our model and then one for testing the final model we select.
+
+Load the neuralnet pakcage:
+
+```{r}
+library(neuralnet)
+```
+
+Then the syntax is nearly identical to what we used for a Random Forest, except the parameters now refer to the structure of the neural network and its fitting features. 
+
+```{r}
+nn = neuralnet(final_grade ~ ., data=df_train, hidden = 3, linear.output = TRUE, threshold=0.01)
+```
+
+Type 
+```{r}
+nn$result.matrix
+```
+to inspect what we have. What is reported are the coefficients or weights assigned to each edge between nodes. In this case a single hidden layer with 3 nodes. 
+
+linear.output=TRUE you would change to FALSE if you were doing classification instead of regression.
+
+R has a brilliant plot function for neural networks:
+
+```{r}
+plot(nn)
+```
+
+Although granted the main thing we usually learn his how impossible a task interpreting this type of model is. Note the extent to which the inputs are shuffled and overlap.
+
+Let's check how it did on the testing set:
+```{r}
+results <- data.frame(actual = df_test$final_grade, prediction = predict(nn, newdata=df_test))
+results
+```
+
+We can write a little function that checks how we did:
+```{r}
+accuracy <- function(results) {
+  deviation <- (results$actual - results$prediction)/results$actual
+  out <- 1 - abs(mean(deviation))
+  out
+}
+accuracy(results)
+```
+
+
+The power is that neural networks have almost unlimited flexibility provided. We can increase both the number of layers and the number of nodes in each layer, and these are the primary parameters we tune for an individual problem:
+
+```{r}
+nn2 = neuralnet(final_grade ~ ., data=df_train, hidden = c(5, 5), act.fct = "logistic", linear.output = FALSE)
+```
+
+Again you can inspect the result:
+```{r}
+nn2$result.matrix
+```
+
+and the plot shows what our parameters changed:
+```{r}
+plot(nn2)
+```
+
+and finally what level of accuracy did we get with the testing data:
+
+```{r}
+results <- data.frame(actual = df_test$final_grade, prediction = predict(nn2, newdata=df_test))
+results
+```
+
+```{r}
+accuracy(results)
+```
+
+In practice you want to be more systematic about this, and use cross validation in the training data when exploring parameter values - giving the training data a chance to perform as both training and testing during the parameter selection phase. Once you have selected your final model is when you would return to the original testing data.
+
+Unfortunately the train function we used for random forest models to implement cross validation for model selection does not work with neural networks.
+
+You can find instructions for doing it manually here: https://www.r-bloggers.com/2015/09/fitting-a-neural-network-in-r-neuralnet-package/
+
+
+
+
+
+
