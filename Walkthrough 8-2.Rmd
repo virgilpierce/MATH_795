@@ -1,6 +1,8 @@
 ---
 title: "Walkthrough 8.2 - Neural Network Models"
-output: html_notebook
+output:
+  html_document:
+    df_print: paged
 ---
 
 We will be using the neuralnet package, so install that if you have not already:

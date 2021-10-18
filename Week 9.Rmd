@@ -1,0 +1,401 @@
+---
+title: "Week 9 -  A Zoo of Models"
+output: html_document
+---
+
+# Outline for the next few classes
+
+## Today and Thursday:  A zoo of models
+
+### Principle Component Analysis
+
+An automated method of feature selection.
+
+### Ridge and Lasso Linear Regression
+
+A modification to linear regression to improve performance on training/testing sets.
+
+### Classification Models
+
+#### Logistic Regression
+
+#### Linear Discriminant Analysis
+
+#### Support Vector Machines
+
+## Week 10:  Bayesian Statistics
+
+A different approach to statistical analysis that is focused on updating assumptions with collected data.
+
+---------------
+
+# Principle Component Analysis
+
+Just as a reminder of what our goal in modeling (both categorical and regression) is:  we want to find a function $F$ that gives
+
+$$ y = F(x_1, x_2, \dots, x_n) + \epsilon $$
+
+where $\epsilon$ is some error term. Our goal is to identify an $F$ such that the $\epsilon$ is as small as possible on new data.
+
+The danger is, even in the cases where there really is such an $F$ (like there is a true $F$), that the observations of both $x$ and $y$ have errors within them. If we train an $F$ that is actually responding to those errors, then we would expect the $\epsilon$ on the training data to be predictebly small and yet on new data it would end up being larger.
+
+One idea is to look for the input features that are most predictive and only use those. With the idea that all of the features contain errors and maybe we can minimize some overfitting by restricting ourselves to only the valuable features. However we want a way to automate this process of identifying features - or even better finding a linear combination of features that works well. 
+
+The other benefit of thinking about feature selection is that we are also getting the sense that sometimes we are building models from data with many many features - as in maybe too many; and a method to pair down the features is worth having.
+
+Finally, as you saw early in the class (Penguins) if we want to graph the results of our model to understand what it is doing we are restricted to really looking at just two variables and an ouput value.
+
+## Linear Algebra
+
+The idea is based in some results in Linear Algebra that are just beyond the scope of the usual course. The method is also of more interest in Engineering and Statistics than in mathematics (generalizing greatly) and so its often not something taught in a math course. However it is an interesting generalization of eigenvalues, and it also is an example showing that Linear Algebra courses for Data Science need to be spending more time on non-square topics.
+
+Recall (or not) that given a square matrix $A$ we can search for eigenvalue / eigenvector pairs $(\lambda, v)$ as solutions to the equation:
+
+$$ A v = \lambda v$$
+
+Roughly these are vector directions in which $A$ acts as a scalar. Putting the eigenvectors $v$ as columns in a matrix $Q$ we have:
+
+$$ A = Q D Q^{-1} $$
+
+where $D$ is a diagonal matrix of the eigenvalues.
+
+In the non-generic cases (i.e. special and rare cases) this decomposition is not possible, but generalizations of it, where $D$ is not a diagonal, are. In the case that $A$ is symmetric ($A = A^T$) then this is further specialized to:
+
+$$ A  = Q D Q^T$$ 
+
+where $QQ^T = I$. A symmetric matrix also guaruntees the eigenvalues are real.
+
+R can find eigenvalues/eigenvectors.
+
+```{r}
+A = matrix( c(2, 2, 4, 1, 3, 1, 3, 3, 3), 3, 3, byrow=TRUE)
+A
+```
+
+Note that in practice I find defining matrices in R to be a bit of a pain. I would hesitate to use R in a linear algebra class and instead I use Python.
+
+```{r}
+ev = eigen(A)
+```
+
+eigen produces both the eigenvalues and their associated (normalized) eigenvectors:
+
+```{r}
+ev$values
+```
+
+```{r}
+ev$vectors
+```
+
+The ev$vectors is the Q matrix in the decomposition, chosen so that the columns have length one.
+
+Load the matlib package (you may have to install it):
+```{r}
+library(matlib)
+```
+
+```{r}
+D = diag(ev$values, 3, 3)
+Q = ev$vectors
+A - Q %*% D %*% inv(Q)
+```
+
+Close to zero. Note there is an inherent error in inverting a matrix and that is the reason we are above machine zero.
+
+### Computing Eigenvalues
+
+You may have learned some techniques for computing eigenvalues - usually we teach students that you can find them by solving the polynomial equation:
+
+$$ \mbox{det}(A - \lambda I) = 0 $$
+
+It turns out that this is generally not a great way to compute them as it amounts to solving a polynomial of degree n. There are other techniques that are much more efficient especially if what we want are approximate eigenvalues. These are what are implemented in most eigenvalue routines. 
+
+## Singular Value Decomposition
+
+Note that for our problems, we are dealing with matrices $X$ that have many more rows than columns (or in the case of image recognition problems, many more columns than rows). Essentially square matrices will not happen in data science. However, recalling what we learned with *Linear Regression* earlier in the course it is maybe not a surprise that what we want to consider is 
+
+$$ X X^T \qquad \mbox{or} \qquard X^T X $$
+
+If $X$ is n by m then $X^T X$ is square m by m; while $X X^T$ is square n by n. We could then compute their eigenvalue diagonalizations:
+
+$$ X^T X = V D_1 V^T $$ 
+
+and 
+
+$$ X X^T = U D_2 U^T $$ 
+
+where $V V^T = I_m$ and $U U^T = I_n$. Note that the two identities are not equal and also that the diagonal matrices have different sizes.
+
+The singular value decomposition of $X$ is then:  
+
+$$ X = U \Sigma V^T$$ 
+
+The columns of U and V are left- and right-singular vectors and the $\Sigma$ is a pseudo-diagonal matrix (it is n by m rather than square) of the singular values, which are positive real numbers:
+
+$$ \Sigma = \begin{pmatrix} s_1 & 0 & \dots \\ 0 & s_2 & \dots \\ \vdots & \vdots & \ddots \\ 0 & \dots & 0 \end{pmatrix} $$
+
+$\Sigma$ is unique, up to the order of the singular values, however the $U$ and $V$ are not unique. If we order $\Sigma$ so that $s_1 > s_2 > \dots $ then $V$ gives an operation that picks out of $X$ the most important contributions in order. I.e. transforming $X$ by the first $k$ columsn of $V$ will give $k$ orthonormal linear combinations of the columns of $X$ that produce column vectors that are the k most important in explaining the variation of the entries of $X$.
+
+### Penguins
+
+This is all a little bit wishy-washy, so lets actually play with a real example. Consider the Penguins Dataset (Irises is usually the first example):
+
+```{r}
+library(tidyverse)
+penguins = read.csv("Datasets/penguins_lter.csv")
+head(penguins)
+```
+
+Let's drop NA values
+```{r}
+penguins = na.omit(penguins)
+```
+
+Check what we have:
+
+```{r}
+glimpse(penguins)
+```
+
+Recode the species feature to numeric:
+
+```{r}
+penguins$Species = as.numeric(as.factor(penguins$Species))
+penguins$Species
+```
+
+
+Let's restrict to just the numeric features (PCA being a method, like the neural nets we saw last class that only functions on numeric inputs):
+
+```{r}
+penguins = penguins[ , unlist(lapply(penguins, is.numeric))]
+head(penguins)
+```
+
+Finally let's clean this up by dropping the columns we don't need:
+
+```{r}
+penguins = subset(penguins, select=-c(Sample.Number, Delta.15.N..o.oo., Delta.13.C..o.oo.))
+penguins
+```
+
+First lets start by plotting the species value with two of the variables as inputs:
+```{r}
+ggplot(data = penguins, aes(x = Flipper.Length..mm., y = Culmen.Depth..mm., col=Species)) + geom_point()
+```
+
+
+
+Conveniently, the feature we are predicting is the first one. We want to apply *Principal Component Analysis* the remaining columns:
+
+```{r}
+penguins.pca = prcomp(penguins[,-1], center = TRUE, scale. = TRUE)
+summary(penguins.pca)
+```
+
+The middle row of the summary identifies the proportion of the variance in the rows of the data that is accounted for the the linear combination of the columns that makes up the corresponding PC. The total of these will be 1. 
+
+```{r}
+str(penguins.pca)
+```
+
+There is a lot here. *rotation* contains the relationship between the input features and the principle components; this together with *center* is what you would use to transform new data into the PCA transformation computed from the training set. The *x* contains the transformed values of each data variable into the new Principal Component variables. 
+
+```{r}
+penguins.pca$rotation
+```
+
+See the instructions here for incorporating new data into the computed projection: https://www.datacamp.com/community/tutorials/pca-analysis-r
+
+Let's plot the new values and what they tell us about the species: first we build a dataset out of the first two PC and the species.
+
+```{r}
+pen_test = data.frame(penguins$Species, penguins.pca$x[,c(1, 2)])
+head(pen_test)
+```
+
+```{r}
+ggplot(data = pen_test, aes(x = PC1, y = PC2, col=penguins.Species)) + geom_point()
+```
+
+It's not perfect (we would be shocked if it is) however it has improved the separation between the two species with overlap, and it has clarified even further the distinction between the third species and the other two.
+
+Note that PCA is an example of unsupervised learning - it is an algorithm for exploring the dataset that does not rely on us having the result of a classification or regression for the training data. 
+
+## PCA for the Education Data from Walkthrough 8
+
+Let's load the education data from Walkthrough 8 that we used for neural networks from last class:
+
+```{r}
+library(tidyverse)
+library(caret)
+library(ranger)
+library(e1071)
+library(tidylog)
+library(dataedu)
+
+df <- dataedu::sci_mo_with_text
+
+df <- 
+  df %>%
+  select(
+    int,
+    uv,
+    pc,
+    time_spent,
+    final_grade,
+    subject,
+    enrollment_reason,
+    semester,
+    enrollment_status,
+    cogproc,
+    social,
+    posemo,
+    negemo,
+    n
+  )
+
+nrow(df)
+
+df <- na.omit(df)
+
+nearZeroVar(df, saveMetrics = TRUE)
+df <- 
+  df %>% 
+  select(-enrollment_status)
+
+df <- 
+  df %>% 
+  mutate_if(is.character, as.factor)
+```
+
+Okay so that's the dataframe we so far from Walkthrough 8; now we need to adjust the variables that are non-numeric to be numeric. The syntax is basically identical to what we just did to turn character variables into factors:
+
+```{r}
+df <- 
+  df %>% 
+  mutate_if(is.factor, as.numeric)
+```
+
+Use glimpse to check that everything is some kind of numeric:
+
+```{r}
+glimpse(df)
+```
+
+There is an inherent danger in converting Factor and particularly Character features into numeric features. Numeric features contain both an ordering and a notion of relative distance between the values. For a dataset with a large number of factor variables we should lean more towards models built with decision trees that will not have these non-features like order and relative distance builtin. Or we should use a pivot type command to replace a column with multiple factors with multiple columns with just two values. 
+
+We will normalize the final grade, but the PCA will take care of normalizing the other variables:
+```{r}
+normalize <- function(x) {
+ return ((x - min(x))/ (max(x) - min(x)))
+}
+
+df$final_grade <- normalize(df$final_grade)
+```
+
+Now we divide our dataset into testing and training sets:
+
+```{r}
+# First, we set a seed to ensure the reproducibility of our data partition.
+set.seed(2020)
+
+# we create a new object called trainIndex that will take 80 percent of the data
+trainIndex <- createDataPartition(df$final_grade,
+                                  p = .8, 
+                                  list = FALSE,
+                                  times = 1)
+
+# We add a new variable to our dataset, temporarily:
+# this will let us select our rows according to their row number
+# we populate the rows with
+# the numbers 1:464, in order
+
+df <- 
+  df %>% 
+  mutate(temp_id = 1:464)
+
+
+df_train <- 
+  df %>% 
+  filter(temp_id %in% trainIndex)
+df_test <- 
+  df %>% 
+  filter(!temp_id %in% trainIndex)
+
+
+df <- 
+  df %>% 
+  select(-temp_id)
+
+df_train <- 
+  df_train %>% 
+  select(-temp_id)
+
+df_test <- 
+  df_test %>% 
+  select(-temp_id)
+```
+
+Again we drop the variable we are trying to predict and run PCA on the remaining matrix:
+```{r}
+df_train.pca = prcomp(select(df_train, -final_grade), center=TRUE, scale.=TRUE)
+summary(df_train.pca)
+```
+
+In this case the payoff of selecting just one or two of the PCA is relatively small. It takes until PC8 to account for more than 80% of the variation in the data.
+
+Still lets see what happens as we feed it through a model. Neural Nets from last class. First we make a dataframe with the principle components we want to use and the result:
+
+```{r}
+df_nn_train = data.frame( df_train$final_grade, df_train.pca$x[,c(1, 2, 3, 4, 5, 6, 7, 8) ] )
+```
+
+Notice that the PCA does the scaling step for us, but the final_grade column needs to be scaled.
+
+
+
+```{r}
+library(neuralnet)
+nn = neuralnet(df_train.final_grade ~ ., data=df_nn_train, hidden = 3, linear.output = TRUE, threshold=0.01)
+```
+
+To apply it to the test set we first need to scale the test sets inputs by the PCA transformation.
+
+We first scale the test data (minus the true value) by the center, and then we transform it by the rotation.
+
+```{r}
+df_test.scale = scale( select(df_test, -final_grade), center = df_train.pca$center)
+df_test.pca = df_test.scale %*% df_train.pca$rotation
+```
+
+Then we recombine with the final grade:
+
+```{r}
+df_nn_test = data.frame( df_test$final_grade, df_test.pca[,c(1, 2, 3, 4, 5, 6, 7, 8) ] )
+```
+
+Note the dimensions of df_nn_test.
+
+Now we can check how our neural net, trained on the PCA data, did:
+
+```{r}
+results <- data.frame(actual = df_nn_test$df_test.final_grade, prediction = predict(nn, newdata=df_nn_test))
+results
+```
+
+```{r}
+accuracy <- function(results) {
+  deviation <- (results$actual - results$prediction)/results$actual
+  out <- 1 - abs(mean(deviation))
+  out
+}
+accuracy(results)
+```
+
+And we have an improvement of 4% with the same sized neural network as last class.
+
+
+
+
