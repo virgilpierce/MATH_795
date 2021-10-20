@@ -1,0 +1,268 @@
+---
+title: "Week 9.2 - A Zoo of Models"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+The new package we need today is glmnet. Maybe install it now before we start.
+```{r}
+library(glmnet)
+```
+
+Continuing with our Zoo of Linear Models (Regression). Let's return to Linear Regression:
+
+## Review of Linear Regression
+
+Recall that linear regression is built to exactly minimize the sum of square errors between the model and a set of training data using linear coefficients (and an intercept). It is computed from solving a linear algebra problem. 
+
+## Advantages of Linear Regression
+
+- Fast model to train
+- Founded on Mathematical Principles from basic courses (Linear Algebra or Calculus)
+- Easy Model to Interpret: the coefficients tell us the precise predicted effect of the features
+- Rigid model: there is a small chance of overfitting 
+- Adding additional features always improves the fit for the training data
+
+## Disadvantages of Linear Regression
+
+- Assumes a linear relationship:  we can adapt in some cases by transforming features (or in R adding the transformation to the model).
+- Requires lots of features if they are categorical (we should pivot long)
+- Rigid model: the model will miss nonlinearity
+- Adding additional features may not improve the fit for the testing data
+
+## Returning to our Week 8 Example
+
+```{r}
+library(tidyverse)
+library(caret)
+library(ranger)
+library(e1071)
+library(tidylog)
+library(dataedu)
+
+df <- dataedu::sci_mo_with_text
+
+df <- 
+  df %>%
+  select(
+    int,
+    uv,
+    pc,
+    time_spent,
+    final_grade,
+    subject,
+    enrollment_reason,
+    semester,
+    enrollment_status,
+    cogproc,
+    social,
+    posemo,
+    negemo,
+    n
+  )
+
+nrow(df)
+
+df <- na.omit(df)
+
+nearZeroVar(df, saveMetrics = TRUE)
+df <- 
+  df %>% 
+  select(-enrollment_status)
+
+df <- 
+  df %>% 
+  mutate_if(is.character, as.factor)
+
+df <- 
+  df %>% 
+  mutate_if(is.factor, as.numeric)
+```
+
+Let's actually pivot long today and turn our dataframe into one with a feature for each value of the factor variables.
+
+```{r}
+# Pivot wider
+df <- df %>% mutate( temp = 1) %>%
+  pivot_wider(names_from = subject, values_from=temp, names_prefix = "subject.", values_fill = 0) %>% mutate( temp = 1) %>%
+  pivot_wider(names_from = enrollment_reason, values_from=temp, names_prefix = "enrollment_reason.", values_fill = 0) %>% mutate( temp = 1) %>%
+  pivot_wider(names_from = semester, values_from=temp, names_prefix = "semester.", values_fill = 0) 
+```
+
+If you inspect df notice the new columns now with zeros and 1s. 
+
+```{r}
+# First, we set a seed to ensure the reproducibility of our data partition.
+set.seed(2020)
+
+# we create a new object called trainIndex that will take 80 percent of the data
+trainIndex <- createDataPartition(df$final_grade,
+                                  p = .8, 
+                                  list = FALSE,
+                                  times = 1)
+
+# We add a new variable to our dataset, temporarily:
+# this will let us select our rows according to their row number
+# we populate the rows with
+# the numbers 1:464, in order
+
+df <- 
+  df %>% 
+  mutate(temp_id = 1:464)
+
+
+df_train <- 
+  df %>% 
+  filter(temp_id %in% trainIndex)
+df_test <- 
+  df %>% 
+  filter(!temp_id %in% trainIndex)
+
+
+df <- 
+  df %>% 
+  select(-temp_id)
+
+df_train <- 
+  df_train %>% 
+  select(-temp_id)
+
+df_test <- 
+  df_test %>% 
+  select(-temp_id)
+```
+
+Let's fit our regular Linear Regression model to the training data:
+```{r}
+lr = lm(final_grade ~ ., data = df_train)
+summary(lr)
+```
+
+Note really a great model - many of the coefficients have significant p-values. Note also the greatly different sizes in the coefficients.
+
+Let's build the result dataframe for the test data as we did with the other recent models:
+
+```{r}
+results <- data.frame(actual = df_test$final_grade, prediction = predict(lr, newdata=df_test))
+results
+```
+
+Not looking super great. Our absolute relative error is now: 
+
+```{r}
+accuracy <- function(results) {
+  deviation <- (results$actual - results$prediction)/results$actual
+  out <- 1 - abs(mean(deviation))
+  out
+}
+accuracy(results)
+```
+
+Keep in mind that this is not the error Linear Regression is built to minimize. We are looking pretty good. Except:
+
+## A new disadvantage
+
+Two new things to notice:
+
+- Interpreting the model becomes harder when we have more features
+- Adding additional features always makes the model more complicated
+
+The algorithm for Linear Regression finds the best linear model for the result from the predictors, which will mean that it has a tendency to use all of the features and assign a non-zero coefficient to them. This is problematic because:
+
+1. It makes interpretation difficult because the model developed incorporates every feature;
+2. It also makes the model dependent on less important features, which as we discussed Tuesday might have content that is more errors than information.
+
+Overall the principal is that given two linear models for our data with comparable errors on the testing data, we would prefer the one that has more cofficients that are exactly zero or near zero to one with larger coefficients. There is nothing in the Linear Regression algorithm we learned that encourages coefficients to not get too larger. 
+
+We will develop two new models today, based on the principle of linear regression, but with an adjustment that will result in encouraging them to find models with small or zero coefficients. Both models are capable of outperforming Linear Regression on testing data and for some problems will provide better results.
+
+What we will do along the way is introduce a paramter into linear regression allowing us to tune the model, making it behave more like k-nearest neighbors or the other parametrized models we have seen.
+
+## Ridge Regression
+
+Linear Regression is trying to choose the coefficients so that the function:
+$$ E(m, b) = \sum_{i=0}^{n-1} (y_i - \hat{y}_i)^2 $$ 
+is minimized (here m is a vector of coefficients that is maybe very long).
+
+Our first attemp at fixing this issue is to change the function we are minimizing by adding a penalty for choosing $m_j$ that are big:
+$$ E_a(m, b) = \sum_{i=0}^{n-1} (y_i - \hat{y}_i )^2 + \lambda \sum_{j=0}^{p-1} m_j^2 $$
+
+Where we have purposefully choosen a penalty that is differentiable in the coefficients - so Ridge Regression, like vanilla Linear Regression has an exact solution (for a given $lambda$).  
+
+How will we choose $a$?
+
+We compute this in R using the glmnet function from eponomyous package. Note that for reasons, the syntax of the glmnet command is not the same as the lm command - Python has the upper hand when visiting the Zoo of Models:
+
+```{r}
+ridge_lr = glmnet(select(df_train,-final_grade), df_train$final_grade, alpha = 0, lambda = 100)
+```
+
+alpha is a variable that selects ridge or lasso regression; lambda is the parameter giving the penalty. Again in an annoyance, the syntax and the format of the output is different from the lm function.
+
+We can inspect the coefficients:
+```{r}
+coef(ridge_lr)
+```
+
+Play with the values of lambda and see if you can get some of the coefficients to become small. Particularly if you choose large values of lambda you should start to see the model favor the intercept and maybe a few other variables.
+
+We can build out test results, and again the syntax is <bad words>.
+
+```{r}
+df_test_inputs <- model.matrix(final_grade ~., data=df_test)
+results <- data.frame(actual = df_test$final_grade, prediction = predict(ridge_lr, newx=df_test_inputs[,-1]) )
+results
+```
+
+Notice that our second variable got renamed:
+
+```{r}
+accuracy <- function(results) {
+  deviation <- (results$actual - results$s0)/results$actual
+  out <- 1 - abs(mean(deviation))
+  out
+}
+accuracy(results)
+```
+
+You should repeat the code above with various lambda to see if we can improve things.
+
+## Lasso Regression
+
+We notice that Ridge, while for sufficiently large $\lambda$ gives smaller coefficients, it is not a fast rule; and it also has the effect of tamping down on all of the coefficients. 
+
+Lasso regression makes two changes. Firstly it gives up on differentiability and changes the penalty to just use the absolute value of the coefficients. This has the effect of giving a strong incentive for a value that is near 0 to just get pushed all the way to 0 by the algoirthm  - there is a big pay off for doing this.
+
+Lasso also takes an average of the sum of the square errors this effect is basically incorporated into the parameter ultimately.
+
+$$ E_\lambda(m, b) = \frac{1}{2n} \sum_{i=0}^{n-1} (y_i - \hat{y}_i)^2 + \lambda \sum_{j=0}^{p-1} | m_j | $$
+
+We implement this in R using the same code as above with $\alpha = 1$:
+
+```{r}
+lasso_lr = glmnet(select(df_train,-final_grade), df_train$final_grade, alpha = 1, lambda = 1)
+```
+
+```{r}
+coef(lasso_lr)
+```
+
+Immediately we see the effect!  Lots of features have been dropped!
+
+```{r}
+df_test_inputs <- model.matrix(final_grade ~., data=df_test)
+results <- data.frame(actual = df_test$final_grade, prediction = predict(lasso_lr, newx=df_test_inputs[,-1]) )
+results
+```
+
+```{r}
+accuracy(results)
+```
+
+Again try different values for $\lambda$ and see if we can find a better performance than the vanilla Linear Regression.
+
+
+
