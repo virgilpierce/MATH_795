@@ -82,7 +82,7 @@ df <-
   mutate_if(is.factor, as.numeric)
 ```
 
-Let's actually pivot long today and turn our dataframe into one with a feature for each value of the factor variables.
+Let's actually pivot wide today and turn our dataframe into one with a feature for each value of the factor variables.
 
 ```{r}
 # Pivot wider

@@ -301,7 +301,7 @@ nearZeroVar(df, saveMetrics = TRUE)</code></pre>
 <pre><code>## mutate_if: converted &#39;subject&#39; from factor to double (0 new NA)</code></pre>
 <pre><code>##            converted &#39;enrollment_reason&#39; from factor to double (0 new NA)</code></pre>
 <pre><code>##            converted &#39;semester&#39; from factor to double (0 new NA)</code></pre>
-<p>Let’s actually pivot long today and turn our dataframe into one with a feature for each value of the factor variables.</p>
+<p>Let’s actually pivot wide today and turn our dataframe into one with a feature for each value of the factor variables.</p>
 <pre class="r"><code># Pivot wider
 df &lt;- df %&gt;% mutate( temp = 1) %&gt;%
   pivot_wider(names_from = subject, values_from=temp, names_prefix = &quot;subject.&quot;, values_fill = 0) %&gt;% mutate( temp = 1) %&gt;%
