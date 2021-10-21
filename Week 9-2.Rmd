@@ -29,7 +29,7 @@ Recall that linear regression is built to exactly minimize the sum of square err
 ## Disadvantages of Linear Regression
 
 - Assumes a linear relationship:  we can adapt in some cases by transforming features (or in R adding the transformation to the model).
-- Requires lots of features if they are categorical (we should pivot long)
+- Requires lots of features if they are categorical (we should pivot wide)
 - Rigid model: the model will miss nonlinearity
 - Adding additional features may not improve the fit for the testing data
 
