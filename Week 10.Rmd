@@ -1,0 +1,221 @@
+---
+title: "Week 10 - A Zoo of Models"
+output: html_document
+---
+
+This week we continue with our Zoo of Models, but looking at classification rather than regression. For better or for worse, we will work with the penguins for this.
+
+```{r}
+library(tidyverse)
+penguins = read.csv("Datasets/penguins_lter.csv")
+head(penguins)
+```
+
+We have seen k-nearest neighbors, and decision trees. Neural network, and ensemble models such as random forests can also be used to develop classification models. However there are a few others that we have not met yet that are worth exploring.
+
+## Logistic Regression
+
+The first which is a basic model, comparable to Linear Regression in complexity is called Logistic Regression. We will develop this model as categorization model for a feature with two possible values. So to begin we recode the three species of penguins into numeric values and then recode them again so that two of the values are 0 and one is a 1.
+
+```{r}
+penguins$Species = as.numeric(as.factor(penguins$Species))
+
+recode <- function(x) { 
+  if (x==1 | x==2) { 
+    0}
+  else { 1}
+}
+  
+penguins$Species = as.numeric(lapply(penguins$Species, recode))
+```
+
+Consider the one dimensional plot:
+
+```{r}
+ggplot(data = penguins, aes(x = Flipper.Length..mm., y=Species, col=Species)) + geom_point()
+```
+
+The idea then is to develop an estimate for the $p(x) = P(\mbox{Species} = 1 | \mbox{Flipper_Length} = x) $, and then make a prediction on whether $p(x)$ is bigger or less than 0.5 (or whatever cut off we deem makes ethical sense for a problem). We could just hit this problem with Linear Regression but notice $p(x)$ is almost surely not linear:
+
+- for values of x much less than 200 it should be close to 0 but never less than 0;
+- for values of x much greater than 210 it should be close to 1 but never greater than 1;
+- somewhere between 200 and 210 the p(x) should have a value of 0.5
+
+
+There is a whole collection of functions that fit these loose properties:  invere tangent, any number of cummulative distribution functions, and the logistic function.
+
+The logistic function is particularly attractive because it takes the form:
+
+$$ p(x) = \frac{ \exp(mx + b) }{1 + \exp(mx + b) } = \frac{1}{1+ \exp(-(mx + b))} $$
+
+Go ahead and play with this in desmos briefly to see what effect the m and b have.
+
+To fit the actual model:
+
+**Likliehood**: For a given choice of m and b we compute how liklie the data observed was as a set of independent Bernouli trials with $p_{m, b}(x)$:
+
+$$ L(m, b| \{ (x_i, y_i) \} ) = \prod_i p_{m, b}(x)^{y_i} (1 - p_{m, b}(x))^{1-y_i} $$
+
+We would then like to choose the values of m and b that maximize the **log likliehood** - why this is the right thing to maximize has a long history of both empiracle and theoretical discussion, but in particular notice that taking the log breaks the product up into a sum.   
+
+$$ N^{-1} \log L(m, b| \{ (x_i, y_i) \}) $$
+
+There is no exact solution method, and so in practice we use gradient descent or Newtons Method to iterate the values of m and b until we have the approximate maximum. 
+
+To implement this in R, first lets return Species to a factor variable:
+
+```{r}
+penguins$Species = factor(penguins$Species)
+mylogit = glm(Species ~ Flipper.Length..mm., data=penguins, family="binomial" )
+```
+
+
+The output is similar to Linear Regression:
+
+```{r}
+summary(mylogit)
+```
+
+Adding multiple variables is straightforward, and R is capable of incorporating factor variables as well:
+
+```{r}
+penguins$Species = factor(penguins$Species)
+mylogit = glm(Species ~ Flipper.Length..mm. + Culmen.Length..mm., data=penguins, family="binomial" )
+```
+
+```{r}
+summary(mylogit)
+```
+
+Plotting the result:
+```{r}
+x = seq(from = 170, to = 240, by = 1)
+y = seq(from = 30, to = 65, by = 0.5)
+
+area = c()
+
+
+for (i in x) {
+    for (j in y) {
+        area = c(area, c(i, j))
+    }
+}
+
+area = array(area, c(2, length(x)*length(y)) ) %>% t()
+```
+
+Convert area to a dataframe and name the columns Flipper and Culment Length:
+
+```{r}
+colnames(area) <- c("Flipper.Length..mm.","Culmen.Length..mm.")
+area <- data.frame(area)
+```
+
+Now add the prediction column to area:
+
+```{r}
+area = mutate(area, prob = predict(mylogit, newdata=area, type="response")) %>% 
+  mutate(pred = ifelse(prob > 0.5, 1, 0) )
+```
+
+Plotting:
+```{r}
+P = ggplot(data = area, aes(x=Flipper.Length..mm., y=Culmen.Length..mm., col=pred)) + geom_point()
+penguins$Species = as.numeric(penguins$Species)
+P + geom_point(data = penguins, aes(x=Flipper.Length..mm., y=Culmen.Length..mm., col=Species, size=2))
+```
+
+Note that the boundary of the logistic regression, because the interior variable is linear, will always be straight lines.
+
+# LDA - Linear Discriminant Analysis
+
+The next model for classification we will explore is called linear discriminant analysis. The basic idea is the same as with *Logistic Regression* above:  estimate the probability that given in the input variables a point is in each of the classes for the output; and then choose the one with the largest of these probabilities as our prediction. The difference is in how that probability is estimated.
+
+In this case the rule we will use is Bayes Theorem:
+$$ P(A | B) = \frac{P(B | A) P(A)}{P(B)} $$
+So it is worth a brief interlude to go over how one derives Bayes Theorem.
+
+Okay so in the context of our classificiation problem: Given the input variables $X$, the probability that $y=k$ is given by:
+$$ P(y=k | X) = \frac{P(X | y=k) P(y=k)}{P(X)} = \frac{P(X |y=k) P(y=k) }{ \sum P(X|y=l) P(y=l) } $$
+
+Where the sum is over all of the classes.
+
+- The $P(y=k)$ can be estimated directly from the proportions of the output variables (i.e. dropping the information in the inputs)
+- So it is the quantities $P(X | y = k)$ that require some work to estimate; and in fact there are different models we could use.
+
+LDA assumes that these values are Normal:
+
+$$ p_k(X) = P(X | y=k) = \frac{1}{N} \exp\left( -\frac{1}{2} (X - \mu_k)^t \Sigma_k (X - mu_k) \right) $$
+
+where $\mu_k$ is the vector of means for the $y=k$ class, and $\Sigma_k$ is the covariance matrix. 
+
+Of course the problem is an estimate, and so the algorithm determines, given the training data for class $y=k$ the values of $\mu_k$ and $\Sigma_k$ that give the best result. 
+
+One simplificiation is that we will assume that the covariance matrices are the same for all classes. This means that the boundaries between classes will be given by linear expressions, hence *Linear Discriminant Analysis*
+
+*Quadratic Deiscriminant Analysis* allows each $\Sigma_k$ to be independent and gives boundaries between classes given by quadratic expressions.
+
+### One Dimensional Example
+
+In one dimension (i.e. one predictor), the problem is straightforward. From the training data,  the mean of the predictor for each class and an estimate the variance from the full set of training data is computed.
+
+```{r}
+penguins = read.csv("Datasets/penguins_lter.csv")
+penguins = na.omit(penguins)
+penguins$Species = as.numeric(as.factor(penguins$Species))
+ggplot(data = penguins, aes(x = Flipper.Length..mm., y=Species, col=Species)) + geom_point()
+```
+
+```{r}
+p1 = penguins %>% filter(Species == 1)
+p2 = penguins %>% filter(Species == 2) 
+p3 = penguins %>% filter(Species == 3)
+
+mu1 = mean(p1$Flipper.Length..mm.)
+mu2 = mean(p2$Flipper.Length..mm.)
+mu3 = mean(p3$Flipper.Length..mm.)
+s = sd(penguins$Flipper.Length..mm. )
+```
+
+Let's plot the three normals we have then:
+
+```{r}
+x = seq(from = 170, to = 240, by = 1)
+y1 = dnorm(x, mu1, s)
+y2 = dnorm(x, mu2, s)
+y3 = dnorm(x, mu3, s)
+df <- data.frame(x,y1,y2, y3)
+ggplot(df, aes(x)) +                    # basic graphical object
+  geom_line(aes(y=y1), colour="red") +  
+  geom_line(aes(y=y2), colour="green") + 
+  geom_line(aes(y=y3), colour="blue")
+```
+
+Beware those, these are not the best we can do - they are merely estimates of $P(X = x | y = k) $ and in fact they don't add up to 1, we need to combine them with the overall proportions giving $P(y=k)$.  Note that this weights the estimates above based on how much of our data comes from each of the three classes -- more data gives us more weight to that distribution. 
+
+Let's finish the computation by hand (though there are ways to compute it direclty in R).
+
+```{r}
+n1 = nrow(p1)
+n2 = nrow(p2)
+n3 = nrow(p3)
+
+py1 = n1/(n1+n2+n3)
+py2 = n2/(n1+n2+n3)
+py3 = n3/(n1+n2+n3)
+
+tot = y1*py1 + y2 * py2 + y3 *py3
+my1 = y1*py1 / tot
+my2 = y2 * py2 / tot
+my3 = y3 * py3 / tot
+df <- data.frame(x, my1, my2, my3)
+ggplot(df, aes(x)) +                    # basic graphical object
+  geom_line(aes(y=my1), colour="red") +  
+  geom_line(aes(y=my2), colour="green") + 
+  geom_line(aes(y=my3), colour="blue")
+
+```
+
+
+
+

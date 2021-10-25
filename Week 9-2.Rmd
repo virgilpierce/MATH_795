@@ -96,7 +96,7 @@ If you inspect df notice the new columns now with zeros and 1s.
 
 ```{r}
 # First, we set a seed to ensure the reproducibility of our data partition.
-set.seed(2020)
+set.seed(2021)
 
 # we create a new object called trainIndex that will take 80 percent of the data
 trainIndex <- createDataPartition(df$final_grade,
@@ -141,7 +141,7 @@ lr = lm(final_grade ~ ., data = df_train)
 summary(lr)
 ```
 
-Note really a great model - many of the coefficients have significant p-values. Note also the greatly different sizes in the coefficients.
+Not really a great model - many of the coefficients have significant p-values. Note also the greatly different sizes in the coefficients.
 
 Let's build the result dataframe for the test data as we did with the other recent models:
 
@@ -197,7 +197,7 @@ How will we choose $a$?
 We compute this in R using the glmnet function from eponomyous package. Note that for reasons, the syntax of the glmnet command is not the same as the lm command - Python has the upper hand when visiting the Zoo of Models:
 
 ```{r}
-ridge_lr = glmnet(select(df_train,-final_grade), df_train$final_grade, alpha = 0, lambda = 100)
+ridge_lr = glmnet(select(df_train,-final_grade), df_train$final_grade, alpha = 0, lambda = 10)
 ```
 
 alpha is a variable that selects ridge or lasso regression; lambda is the parameter giving the penalty. Again in an annoyance, the syntax and the format of the output is different from the lm function.
@@ -206,6 +206,11 @@ We can inspect the coefficients:
 ```{r}
 coef(ridge_lr)
 ```
+
+```{r}
+coef(lr)
+```
+
 
 Play with the values of lambda and see if you can get some of the coefficients to become small. Particularly if you choose large values of lambda you should start to see the model favor the intercept and maybe a few other variables.
 
@@ -243,7 +248,7 @@ $$ E_\lambda(m, b) = \frac{1}{2n} \sum_{i=0}^{n-1} (y_i - \hat{y}_i)^2 + \lambda
 We implement this in R using the same code as above with $\alpha = 1$:
 
 ```{r}
-lasso_lr = glmnet(select(df_train,-final_grade), df_train$final_grade, alpha = 1, lambda = 1)
+lasso_lr = glmnet(select(df_train,-final_grade), df_train$final_grade, alpha = 1, lambda =0.5 )
 ```
 
 ```{r}
