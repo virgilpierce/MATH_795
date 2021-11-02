@@ -1,0 +1,100 @@
+---
+title: "Week 11 Bayes Continued"
+author: "Lida Bentz"
+date: "11/2/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+```
+
+# Bayes: Is our coin fair?
+
+we flip the coin and get $H$. 
+
+Q: What can we say about whether the coin is fair or not fair. 
+
+Having the Bayes tool we decide to apply that. 
+
+We need a set of hypothesis. $p=P(H)$. We don't know $p$ _but we can model things we don't know with random variables_
+
+What possible values could $p$ take? $0\leq p \leq 1$ 
+
+We can come up with a __discrete__ model where we choose finitely many values for $p$ and assign a value to $P(p=x)$ for each value, with the constraint that $\sum_x P(p=x)=1$. 
+
+We could do a __continuous__ model any $p=x$ between $0\leq x\leq 1$ is possible and assign a density $f(x)$ where density is $\int_a^b f(x) dx=P(a\leq p\leq b)$. 
+
+## Discrete Model
+We need to choose discrete values as hypothesis.
+```{r}
+x=seq(from=0, to=1,by=0.01)
+x
+```
+Above are our hypothesis.
+Below is our prior.
+```{r}
+hp=1/length(x)
+hp
+```
+According to Bayes, given a value of $p$ how likely is it that I have flipped the coin and gotten $H$, so $P(H_p)=x$
+```{r}
+PH_p=x
+```
+Then add up my prior estimates
+```{r}
+tot=sum(hp*PH_p)
+Pp_H=hp*PH_p/tot
+Pp_H
+sum(Pp_H)
+```
+
+So we plot them
+```{r}
+plot(x, Pp_H)
+```
+So one coin flip is not that much data. Let's flip it again, we get a H (heads). Given a new coin flip, we use $PH_p$ as the new prior estimate. 
+```{r}
+prior=Pp_H
+P2Hp=x
+tot=sum(x*prior)
+posterior=x*prior/tot
+
+plot(x,posterior)
+```
+### flip the coin a third time. We get a T
+```{r}
+prior=posterior
+HT_p=(1-x)
+tot=sum(HT_p*prior)
+posterior=HT_p*prior/tot
+
+plot(x, posterior)
+```
+ The finer you make the discrete model, it will converge to the continuous model. 
+## Continuous Model
+ In the continuous case, the prior is some valid density funciton $f(x)$. A valid density is if we integrate over the density, we get valid probability. This implies
+ $$f(x)>0$$
+ $$\int_0^1 f(x) dx=1$$
+ Any $f$ that satisfies the above is a possibility. There is a whole family of functions call beta distributions that meet this criteria. 
+ A flat prior would be a constant density, $f(x)=1$. or $f(x)=2x$. 
+ Then we need to assign $P(H\vert p=x)=x$. (assign for $f(x)=1$). Then 
+ $$totj=\int_0^1 P(H\vert p=x)\cdot f(x) dx=\int_0^1 x dx=\frac{1}{2}$$
+ Then $$P(p=x\vert H)=\frac{x}{\frac{1}{2}}=2x$$
+ 
+ 
+### Suppose we flip it again 
+ and get a heads, 
+ $P(H\vert p=x, H)$ still is $x$. 
+ Now $tot=\int_0^1 x\cdot 2x dx=\frac{2}{3} x^3$. Thus my new posterior is $P(HH\vert p=x)=\frac{2x^2}{\frac{2}{3}}=3x^2$. 
+ 
+### Third flip 
+ is a tail
+ $P(T\vert p=x, HH)=1-x$. 
+ $$tot=\int_0^1 (1-x)3x^2 dx=\int_0^1 (3x^2-3x^3) dx=1-\frac{3}{4}=1/4$$
+ THEN $$P(HHT\vert p=x)=\frac{(1-x)3x^2}{1/4}=12(1-x)x^2$$
+
+Some notes that THC at 20% more lucrative than lower. How would you prove the suspition that the lab is manipulating to get values over 20%. _Given a set of concentration measurements, can we detect if the lab manipulated them?_
+What you will need to do to answer this question, you will need a model aka some hypothesis for distributions. 
+ 
